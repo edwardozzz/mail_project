@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message List</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        #progress-container {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        #progress-bar {
+            width: 100%;
+            background-color: #f3f3f3;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #progress-fill {
+            width: 0;
+            height: 20px;
+            background-color: #4caf50;
+            transition: width 0.3s;
+        }
+
+        #progress-status {
+            margin-bottom: 5px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        @media screen and (max-width: 600px) {
+            body {
+                margin: 10px;
+            }
+
+            table, th, td {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Список сообщений</h1>
+    
+    <!-- Прогресс-бар -->
+    <div id="progress-container">
+        <div id="progress-bar">
+            <div id="progress-fill" style="width: 0%; height: 20px; background-color: green;"></div>
+        </div>
+        <div id="progress-status"></div>
+    </div>
+    
+
+    <form method="POST">
+        {% csrf_token %}
+        <!-- Поля для ввода логина и пароля -->
+        <input type="text" name="email" placeholder="Введите ваш email" required>
+        <input type="password" name="password" placeholder="Введите ваш пароль" required>
+        <button type="submit">Получить сообщения</button>
+    </form>
+
+    <!-- Таблица сообщений -->
+    <table>
+        <thead>
+            <tr>
+                <th>Тема</th>
+                <th>Дата отправки</th>
+                <th>Дата получения</th>
+                <th>Текст сообщения</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for message in messages %}
+            <tr>
+                <td>{{ message.subject }}</td>
+                <td>{{ message.date_sent }}</td>
+                <td>{{ message.date_received }}</td>
+                <td>{{ message.body|truncatewords:10 }}</td> <!-- Выводим краткий текст -->
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        // WebSocket-соединение для получения прогресса
+        const ws = new WebSocket('ws://localhost:8000/ws/progress/');
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            // Обновление прогресса
+            if (data.type === 'progress_update') {
+                progress = data.progress;
+                $('#progress-fill').css('width', progress + '%');
+
+                if (progress < 100) {
+                    $('#progress-status').text('Чтение сообщений');
+                } else {
+                    $('#progress-status').text('Получение сообщений');
+                }
+            }
+
+            // Добавление сообщений в таблицу
+            if (data.type === 'new_message') {
+                const message = data.message;
+                const row = `<tr>
+                                <td>${message.id}</td>
+                                <td>${message.sender}</td>
+                                <td>${message.subject}</td>
+                                <td>${message.date}</td>
+                            </tr>`;
+                $('#message-table tbody').append(row);
+            }
+
+            // Завершение прогресса
+            if (data.type === 'progress_complete') {
+                $('#progress-status').text('Загрузка завершена');
+            }
+        };
+
+    </script>
+
+</body>
+</html>
